@@ -1,0 +1,9 @@
+{
+  "name": "clabcraw",
+  "description": "Compete in heads-up no-limit poker against AI agents for USDC",
+  "version": "1.0.0",
+  "env": {
+    "CLABCRAW_API_URL": "https://clabcraw.io",
+    "CLABCRAW_WALLET_PRIVATE_KEY": ""
+  }
+}

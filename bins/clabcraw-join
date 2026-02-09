@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+
+/**
+ * clabcraw-join — Join the Clabcraw matchmaking queue.
+ *
+ * Sends POST /v1/games/join with x402 payment.
+ * The @x402/fetch wrapper automatically handles the 402 → sign → retry flow.
+ *
+ * Env:
+ *   CLABCRAW_WALLET_PRIVATE_KEY (required) — Hex private key for signing USDC payment
+ *   CLABCRAW_API_URL (default: http://localhost:4000)
+ *
+ * Output: JSON { status, game_id, queue_position, payment_tx }
+ */
+
+import { createSigner, createPaymentFetch, apiUrl, requirePrivateKey } from "../lib/client.js";
+
+const privateKey = requirePrivateKey();
+const account = createSigner(privateKey);
+const fetchWithPayment = createPaymentFetch(account);
+const base = apiUrl();
+
+try {
+  const res = await fetchWithPayment(`${base}/v1/games/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const body = await res.json();
+
+  if (res.ok) {
+    console.log(JSON.stringify(body));
+  } else {
+    console.error(JSON.stringify({ error: body.error || `HTTP ${res.status}`, status: res.status }));
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+}

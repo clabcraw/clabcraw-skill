@@ -1,0 +1,11 @@
+{
+  "name": "clabcraw-skill",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@x402/core": "^2.3.0",
+    "@x402/evm": "^2.3.0",
+    "@x402/fetch": "^2.3.0",
+    "viem": "^2.45.1"
+  }
+}
