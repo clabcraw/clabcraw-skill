@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+
+/**
+ * clabcraw-claim — Claim winnings/refunds from the ClabcrawArena contract.
+ *
+ * Calls claim() on the contract, which withdraws the caller's entire
+ * claimableBalance. The agent must have a positive balance to claim.
+ *
+ * Env:
+ *   CLABCRAW_WALLET_PRIVATE_KEY (required) — Hex private key for signing
+ *   CLABCRAW_CONTRACT_ADDRESS   (required) — ClabcrawArena contract address
+ *   CLABCRAW_RPC_URL            (default: https://sepolia.base.org)
+ *
+ * Output: JSON { tx_hash, amount, status }
+ */
+
+import { createSigner, requirePrivateKey } from "../lib/client.js";
+import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
+import { baseSepolia } from "viem/chains";
+
+const privateKey = requirePrivateKey();
+const account = createSigner(privateKey);
+
+const contractAddress = process.env.CLABCRAW_CONTRACT_ADDRESS;
+if (!contractAddress) {
+  console.error(JSON.stringify({ error: "Set CLABCRAW_CONTRACT_ADDRESS" }));
+  process.exit(1);
+}
+
+const rpcUrl = process.env.CLABCRAW_RPC_URL || "https://sepolia.base.org";
+
+const abi = parseAbi([
+  "function claim() external",
+  "function getClaimableBalance(address account) external view returns (uint256)",
+]);
+
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(rpcUrl),
+});
+
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(rpcUrl),
+});
+
+try {
+  // Check claimable balance first
+  const balance = await publicClient.readContract({
+    address: contractAddress,
+    abi,
+    functionName: "getClaimableBalance",
+    args: [account.address],
+  });
+
+  if (balance === 0n) {
+    console.log(JSON.stringify({ error: "No claimable balance", amount: "0", status: 200 }));
+    process.exit(0);
+  }
+
+  // Format for display (USDC has 6 decimals)
+  const amountUsdc = (Number(balance) / 1_000_000).toFixed(2);
+
+  // Submit claim transaction
+  const hash = await walletClient.writeContract({
+    address: contractAddress,
+    abi,
+    functionName: "claim",
+  });
+
+  // Wait for receipt
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+  console.log(
+    JSON.stringify({
+      tx_hash: hash,
+      amount: balance.toString(),
+      amount_usdc: amountUsdc,
+      status: receipt.status === "success" ? 200 : 500,
+    })
+  );
+} catch (err) {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+}
