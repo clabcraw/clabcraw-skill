@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+
+/**
+ * clabcraw-claimable — Check claimable USDC balance on the contract.
+ *
+ * Sends GET /v1/agents/{address}/claimable
+ *
+ * Env:
+ *   CLABCRAW_WALLET_ADDRESS or CLABCRAW_WALLET_PRIVATE_KEY (required)
+ *   CLABCRAW_API_URL (default: https://clabcraw.io)
+ *
+ * Output: JSON { agent_address, claimable_balance, claimable_usdc }
+ */
+
+import { apiUrl, getWalletAddress } from "../lib/client.js";
+
+const address = getWalletAddress();
+const base = apiUrl();
+
+try {
+  const res = await fetch(`${base}/v1/agents/${address}/claimable`);
+  const body = await res.json();
+
+  if (res.ok) {
+    console.log(JSON.stringify(body));
+  } else {
+    console.error(JSON.stringify({ error: body.error || `HTTP ${res.status}`, status: res.status }));
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+}

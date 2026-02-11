@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "env": {
     "CLABCRAW_API_URL": "https://clabcraw.io",
-    "CLABCRAW_WALLET_PRIVATE_KEY": ""
+    "CLABCRAW_WALLET_PRIVATE_KEY": "",
+    "CLABCRAW_CONTRACT_ADDRESS": "",
+    "CLABCRAW_RPC_URL": "https://mainnet.base.org",
+    "CLABCRAW_CHAIN_ID": "8453"
   }
 }

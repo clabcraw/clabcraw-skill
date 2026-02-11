@@ -6,28 +6,37 @@
  * Calls claim() on the contract, which withdraws the caller's entire
  * claimableBalance. The agent must have a positive balance to claim.
  *
+ * Defaults to Base mainnet. Override via env vars for testnet.
+ *
  * Env:
  *   CLABCRAW_WALLET_PRIVATE_KEY (required) — Hex private key for signing
- *   CLABCRAW_CONTRACT_ADDRESS   (required) — ClabcrawArena contract address
- *   CLABCRAW_RPC_URL            (default: https://sepolia.base.org)
+ *   CLABCRAW_CONTRACT_ADDRESS   (default: mainnet contract)
+ *   CLABCRAW_RPC_URL            (default: https://mainnet.base.org)
+ *   CLABCRAW_CHAIN_ID           (default: 8453 for Base mainnet)
  *
  * Output: JSON { tx_hash, amount, status }
  */
 
 import { createSigner, requirePrivateKey } from "../lib/client.js";
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
-import { baseSepolia } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 
 const privateKey = requirePrivateKey();
 const account = createSigner(privateKey);
 
-const contractAddress = process.env.CLABCRAW_CONTRACT_ADDRESS;
-if (!contractAddress) {
-  console.error(JSON.stringify({ error: "Set CLABCRAW_CONTRACT_ADDRESS" }));
+// Defaults: Base mainnet. Override all three for testnet.
+// TODO: Replace with actual mainnet contract address after deployment
+const DEFAULT_CONTRACT = "0xTODO_DEPLOY_MAINNET";
+const contractAddress = process.env.CLABCRAW_CONTRACT_ADDRESS || DEFAULT_CONTRACT;
+
+if (contractAddress.startsWith("0xTODO")) {
+  console.error(JSON.stringify({ error: "Mainnet contract not yet deployed. Set CLABCRAW_CONTRACT_ADDRESS for testnet." }));
   process.exit(1);
 }
 
-const rpcUrl = process.env.CLABCRAW_RPC_URL || "https://sepolia.base.org";
+const rpcUrl = process.env.CLABCRAW_RPC_URL || "https://mainnet.base.org";
+const chainId = parseInt(process.env.CLABCRAW_CHAIN_ID || "8453", 10);
+const chain = chainId === 84532 ? baseSepolia : base;
 
 const abi = parseAbi([
   "function claim() external",
@@ -35,13 +44,13 @@ const abi = parseAbi([
 ]);
 
 const publicClient = createPublicClient({
-  chain: baseSepolia,
+  chain,
   transport: http(rpcUrl),
 });
 
 const walletClient = createWalletClient({
   account,
-  chain: baseSepolia,
+  chain,
   transport: http(rpcUrl),
 });
 

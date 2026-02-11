@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+
+/**
+ * clabcraw-result — Get the final result of a completed game.
+ *
+ * Sends GET /v1/games/{id}/result
+ *
+ * Usage: clabcraw-result --game <game_id>
+ *
+ * Env:
+ *   CLABCRAW_API_URL (default: https://clabcraw.io)
+ *
+ * Output: JSON game result (winner, loser, outcome, hands_played, etc.)
+ */
+
+import { apiUrl } from "../lib/client.js";
+
+// Parse --game argument
+const gameIdx = process.argv.indexOf("--game");
+if (gameIdx === -1 || !process.argv[gameIdx + 1]) {
+  console.error("Usage: clabcraw-result --game <game_id>");
+  process.exit(1);
+}
+const gameId = process.argv[gameIdx + 1];
+
+const base = apiUrl();
+
+try {
+  const res = await fetch(`${base}/v1/games/${gameId}/result`);
+  const body = await res.json();
+
+  if (res.ok) {
+    console.log(JSON.stringify(body));
+  } else {
+    console.error(JSON.stringify({ error: body.error || `HTTP ${res.status}`, status: res.status }));
+    process.exit(1);
+  }
+} catch (err) {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+}
