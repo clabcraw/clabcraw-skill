@@ -7,7 +7,7 @@
  *
  * Env:
  *   CLABCRAW_WALLET_ADDRESS or CLABCRAW_WALLET_PRIVATE_KEY (required)
- *   CLABCRAW_API_URL (default: https://clabcraw.io)
+ *   CLABCRAW_API_URL (default: https://clabcraw.sh)
  *
  * Output: JSON { agent_address, claimable_balance, claimable_usdc }
  */

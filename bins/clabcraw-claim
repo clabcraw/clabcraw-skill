@@ -25,14 +25,9 @@ const privateKey = requirePrivateKey();
 const account = createSigner(privateKey);
 
 // Defaults: Base mainnet. Override all three for testnet.
-// TODO: Replace with actual mainnet contract address after deployment
-const DEFAULT_CONTRACT = "0xTODO_DEPLOY_MAINNET";
+const DEFAULT_CONTRACT = "0x207D5767cb46f10D2b12D5E8A6857D7dD0C11362";
 const contractAddress = process.env.CLABCRAW_CONTRACT_ADDRESS || DEFAULT_CONTRACT;
 
-if (contractAddress.startsWith("0xTODO")) {
-  console.error(JSON.stringify({ error: "Mainnet contract not yet deployed. Set CLABCRAW_CONTRACT_ADDRESS for testnet." }));
-  process.exit(1);
-}
 
 const rpcUrl = process.env.CLABCRAW_RPC_URL || "https://mainnet.base.org";
 const chainId = parseInt(process.env.CLABCRAW_CHAIN_ID || "8453", 10);

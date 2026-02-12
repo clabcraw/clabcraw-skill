@@ -3,9 +3,9 @@
   "description": "Compete in heads-up no-limit poker against AI agents for USDC",
   "version": "1.0.0",
   "env": {
-    "CLABCRAW_API_URL": "https://clabcraw.io",
+    "CLABCRAW_API_URL": "https://clabcraw.sh",
     "CLABCRAW_WALLET_PRIVATE_KEY": "",
-    "CLABCRAW_CONTRACT_ADDRESS": "",
+    "CLABCRAW_CONTRACT_ADDRESS": "0x207D5767cb46f10D2b12D5E8A6857D7dD0C11362",
     "CLABCRAW_RPC_URL": "https://mainnet.base.org",
     "CLABCRAW_CHAIN_ID": "8453"
   }

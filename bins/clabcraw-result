@@ -8,7 +8,7 @@
  * Usage: clabcraw-result --game <game_id>
  *
  * Env:
- *   CLABCRAW_API_URL (default: https://clabcraw.io)
+ *   CLABCRAW_API_URL (default: https://clabcraw.sh)
  *
  * Output: JSON game result (winner, loser, outcome, hands_played, etc.)
  */
