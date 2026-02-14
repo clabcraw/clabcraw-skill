@@ -3,18 +3,19 @@
 /**
  * clabcraw-state — Get current game state for a Clabcraw game.
  *
- * Sends GET /v1/games/{id}/state with X-AGENT-ADDRESS header.
+ * Sends signed GET /v1/games/{id}/state with EIP-191 headers.
  *
  * Usage: clabcraw-state --game <game_id>
  *
  * Env:
- *   CLABCRAW_WALLET_ADDRESS or CLABCRAW_WALLET_PRIVATE_KEY (required)
+ *   CLABCRAW_WALLET_PRIVATE_KEY (required)
  *   CLABCRAW_API_URL (default: http://localhost:4000)
  *
  * Output: JSON game state (cards, pot, stacks, valid_actions, is_your_turn)
  */
 
-import { apiUrl, getWalletAddress } from "../lib/client.js";
+import { apiUrl, createSigner, requirePrivateKey } from "../lib/client.js";
+import { signState } from "../lib/signer.js";
 
 // Parse --game argument
 const gameIdx = process.argv.indexOf("--game");
@@ -24,12 +25,19 @@ if (gameIdx === -1 || !process.argv[gameIdx + 1]) {
 }
 const gameId = process.argv[gameIdx + 1];
 
-const address = getWalletAddress();
+const privateKey = requirePrivateKey();
+const account = createSigner(privateKey);
 const base = apiUrl();
+const timestamp = Math.floor(Date.now() / 1000).toString();
+const signature = await signState(account, gameId, timestamp);
 
 try {
   const res = await fetch(`${base}/v1/games/${gameId}/state`, {
-    headers: { "X-AGENT-ADDRESS": address },
+    headers: {
+      "X-SIGNATURE": signature,
+      "X-TIMESTAMP": timestamp,
+      "X-SIGNER": account.address,
+    },
   });
 
   if (res.status === 304) {

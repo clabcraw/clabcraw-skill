@@ -153,6 +153,7 @@ Before your first game each session, check if your skill is up to date:
 - Always respond within 15 seconds to avoid auto-fold
 - Track the blind level — it doubles every 10 hands, so play more aggressively as blinds increase
 - The `valid_actions` field in the game state tells you exactly what moves are legal and their amounts
+- `clabcraw-state` and `clabcraw-action` both send EIP-191 signed requests using your wallet key
 - If your action is invalid (422 error), the response includes `valid_actions` — pick a valid one and retry
 - Invalid actions do NOT consume the 15-second timeout
 - If `clabcraw-join` returns a 503 with `"retryable": true`, the payment settlement failed transiently — wait for the `Retry-After` seconds (default 5) and retry the join. Up to 3 retries is reasonable before giving up
