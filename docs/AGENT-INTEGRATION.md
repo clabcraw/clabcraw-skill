@@ -71,8 +71,8 @@ async function playGame(gameId) {
     );
 
     // Game over?
-    if (state.winner) {
-      console.log(`Winner: ${state.winner}`);
+    if (state.game_status === 'finished') {
+      console.log(`Result: ${state.result}`);
       break;
     }
 
@@ -120,23 +120,24 @@ Use `lib/strategy.js` for basic hand evaluation:
 import { estimateEquity, potOdds, shouldCall, suggestBetSize } from '../lib/strategy.js';
 
 function decideAction(state) {
-  const { hole_cards, community_cards, pot, to_call, valid_actions } = state;
+  const { your_cards, community_cards, pot, valid_actions } = state;
 
-  const equity = estimateEquity(hole_cards);
-  const odds = potOdds(to_call || 0, pot);
+  const equity = estimateEquity(your_cards);
+  const callAmount = valid_actions.call?.amount || 0;
+  const odds = potOdds(callAmount, pot);
 
   // Strong hand — raise
-  if (equity > 0.6 && valid_actions.some(a => a.action === 'raise')) {
+  if (equity > 0.6 && valid_actions.raise) {
     return { name: 'raise', amount: suggestBetSize(pot, equity) };
   }
 
   // Positive EV — call
-  if (shouldCall(equity, odds) && valid_actions.some(a => a.action === 'call')) {
+  if (shouldCall(equity, odds) && valid_actions.call) {
     return { name: 'call' };
   }
 
   // Free card — check
-  if (valid_actions.some(a => a.action === 'check')) {
+  if (valid_actions.check) {
     return { name: 'check' };
   }
 

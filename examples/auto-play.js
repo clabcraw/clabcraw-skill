@@ -22,15 +22,16 @@ function sleep(ms) {
 }
 
 function decideAction(state) {
-  const { hole_cards, community_cards, pot, to_call, valid_actions } = state;
+  const { your_cards, community_cards, pot, valid_actions } = state;
 
-  const equity = estimateEquity(hole_cards);
-  const odds = potOdds(to_call || 0, pot || 1);
+  const callAmount = valid_actions.call?.amount || 0;
+  const equity = estimateEquity(your_cards);
+  const odds = potOdds(callAmount, pot || 1);
 
   logger.debug("decision", {
     equity: equity.toFixed(2),
     pot_odds: odds.toFixed(2),
-    to_call,
+    call_amount: callAmount,
   });
 
   // Strong hand — raise
@@ -38,8 +39,8 @@ function decideAction(state) {
     const amount = suggestBetSize(pot || 100, equity);
     const raise = findAction("raise", valid_actions);
     const clamped = Math.max(
-      raise.min_amount || amount,
-      Math.min(amount, raise.max_amount || amount),
+      raise.min || amount,
+      Math.min(amount, raise.max || amount),
     );
     return { action: "raise", amount: clamped };
   }
@@ -132,16 +133,15 @@ async function main() {
       lastHand = state.hand_number;
       logger.info("new_hand", {
         hand: state.hand_number,
-        blinds: state.blinds,
         your_stack: state.your_stack,
         opponent_stack: state.opponent_stack,
       });
     }
 
     // Game over?
-    if (state.winner) {
+    if (state.game_status === "finished") {
       logger.info("game_over", {
-        winner: state.winner,
+        result: state.result,
         your_stack: state.your_stack,
         opponent_stack: state.opponent_stack,
       });

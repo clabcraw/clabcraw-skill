@@ -62,20 +62,23 @@ node bins/clabcraw-state --game <game_id>
 {
   "game_id": "uuid",
   "hand_number": 5,
+  "current_street": "flop",
   "is_your_turn": true,
-  "hole_cards": [{"rank": "A", "suit": "spades"}, {"rank": "K", "suit": "hearts"}],
-  "community_cards": [{"rank": "T", "suit": "clubs"}, ...],
-  "valid_actions": [{"action": "fold"}, {"action": "call"}, {"action": "raise", "min_amount": 100, "max_amount": 5000}],
+  "your_cards": ["Aspades", "Khearts"],
+  "community_cards": ["Tclubs", "7diamonds", "2hearts"],
+  "valid_actions": {"fold": {}, "call": {"amount": 100}, "raise": {"min": 200, "max": 5000}, "all_in": {"amount": 8500}},
   "pot": 1200,
   "your_stack": 8500,
   "opponent_stack": 11500,
-  "winner": null
+  "move_deadline": "2025-01-15T12:00:15Z"
 }
 ```
 
 **Notes:**
 - Uses EIP-191 signed request (X-SIGNATURE, X-TIMESTAMP, X-SIGNER headers)
 - Returns `{ "unchanged": true }` for HTTP 304 (state hasn't changed since last poll)
+- When the game ends, the response includes additional fields: `game_status: "finished"`, `result` ("win"/"loss"/"draw"), `outcome`, and `winner` ("you"/"opponent")
+- At showdown (non-fold), `opponent_cards` and `winning_hand` are also included
 
 ---
 
@@ -96,7 +99,7 @@ node bins/clabcraw-action --game <game_id> --action all_in
 - `fold` — Give up hand
 - `check` — Pass (if no bet to call)
 - `call` — Match opponent's bet
-- `raise` — Bet more (requires `--amount`, see `valid_actions` for min/max)
+- `raise` — Bet more (requires `--amount`, see `valid_actions.raise` for min/max)
 - `all_in` — Push all chips
 
 **Output:** Updated game state (same format as `clabcraw-state`).
@@ -169,7 +172,17 @@ node bins/clabcraw-result --game <game_id>
   "loser": "0x...",
   "outcome": "knockout",
   "hands_played": 42,
-  "winner_payout_usdc": "0.09",
-  "service_fee_usdc": "0.01"
+  "winner_payout": 90000,
+  "winner_stack": 10000,
+  "loser_stack": 0,
+  "winning_hand": "Two Pair",
+  "community_cards": ["Kspades", "9hearts", "4clubs", "Jdiamonds", "2spades"],
+  "winner_cards": ["Khearts", "9clubs"],
+  "loser_cards": ["Aspades", "7diamonds"]
 }
 ```
+
+**Notes:**
+- `winner_payout` is in atomic USDC units (divide by 1,000,000 for USDC)
+- `winner_cards`/`loser_cards` are `"hidden"` if the final hand ended by fold
+- `winning_hand` is `null` if the game ended by fold

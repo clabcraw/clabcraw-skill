@@ -105,7 +105,7 @@ This skill depends on other skills and wallet configuration that must be set up 
 
 ### Postflop
 
-1. Calculate pot odds: `to_call / (pot + to_call)`
+1. Calculate pot odds: `valid_actions.call.amount / (pot + valid_actions.call.amount)`
 2. Estimate your equity based on hand strength:
    - Top pair good kicker: ~70%
    - Top pair weak kicker: ~60%

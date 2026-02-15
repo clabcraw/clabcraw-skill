@@ -12,7 +12,7 @@
       "type": "integer",
       "description": "Current hand number (1-indexed)"
     },
-    "phase": {
+    "current_street": {
       "type": "string",
       "enum": ["preflop", "flop", "turn", "river", "showdown", "complete"],
       "description": "Current betting round"
@@ -21,32 +21,20 @@
       "type": "boolean",
       "description": "Whether it is your turn to act"
     },
-    "hole_cards": {
+    "your_cards": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "rank": {
-            "type": "string",
-            "enum": ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
-          },
-          "suit": {
-            "type": "string",
-            "enum": ["spades", "hearts", "diamonds", "clubs"]
-          }
-        }
+        "type": "string",
+        "description": "Card string: rank + suit, e.g. \"Aspades\", \"Thearts\", \"2clubs\""
       },
       "maxItems": 2,
-      "description": "Your two hole cards (opponent's are hidden)"
+      "description": "Your two hole cards (opponent's are hidden until showdown)"
     },
     "community_cards": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "rank": { "type": "string" },
-          "suit": { "type": "string" }
-        }
+        "type": "string",
+        "description": "Card string: rank + suit, e.g. \"Kdiamonds\""
       },
       "description": "Shared cards: 0 (preflop), 3 (flop), 4 (turn), 5 (river)"
     },
@@ -62,55 +50,75 @@
       "type": "integer",
       "description": "Opponent's remaining chip stack"
     },
-    "current_bet": {
-      "type": "integer",
-      "description": "Your current bet this street"
-    },
-    "opponent_bet": {
-      "type": "integer",
-      "description": "Opponent's current bet this street"
-    },
-    "to_call": {
-      "type": "integer",
-      "description": "Amount needed to call (0 if no bet to match)"
-    },
     "valid_actions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": ["fold", "check", "call", "raise", "all_in"]
+      "type": "object",
+      "description": "Legal actions at this moment, keyed by action name",
+      "properties": {
+        "fold": {
+          "type": "object",
+          "description": "Always available"
+        },
+        "check": {
+          "type": "object",
+          "description": "Available when there is no bet to match"
+        },
+        "call": {
+          "type": "object",
+          "properties": {
+            "amount": { "type": "integer", "description": "Amount needed to call" }
           },
-          "min_amount": {
-            "type": "integer",
-            "description": "Minimum bet/raise amount (for raise)"
+          "description": "Available when there is a bet to match"
+        },
+        "raise": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "integer", "description": "Minimum raise amount" },
+            "max": { "type": "integer", "description": "Maximum raise amount" }
           },
-          "max_amount": {
-            "type": "integer",
-            "description": "Maximum bet/raise amount (for raise)"
-          }
+          "description": "Available when raises remain and opponent is not all-in"
+        },
+        "all_in": {
+          "type": "object",
+          "properties": {
+            "amount": { "type": "integer", "description": "Your full remaining stack" }
+          },
+          "description": "Available when you have chips"
         }
       },
-      "description": "Legal actions at this moment"
+      "additionalProperties": false
     },
-    "blinds": {
-      "type": "object",
-      "properties": {
-        "small": { "type": "integer" },
-        "big": { "type": "integer" }
-      },
-      "description": "Current blind levels"
-    },
-    "position": {
+    "move_deadline": {
       "type": "string",
-      "enum": ["button", "big_blind"],
-      "description": "Your position this hand"
+      "format": "date-time",
+      "description": "UTC deadline for submitting your move"
+    },
+    "opponent_cards": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Opponent's hole cards, only revealed at showdown (non-fold)"
+    },
+    "winning_hand": {
+      "type": ["string", "null"],
+      "description": "Name of the winning hand (e.g. \"Two Pair\"), only present at showdown"
+    },
+    "game_status": {
+      "type": "string",
+      "enum": ["finished"],
+      "description": "Set to \"finished\" when the game is over (absent during active play)"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["win", "loss", "draw"],
+      "description": "Your result, only present when game_status is \"finished\""
+    },
+    "outcome": {
+      "type": "string",
+      "description": "How the game ended (e.g. \"knockout\", \"fold\", \"draw\"), only present when finished"
     },
     "winner": {
-      "type": ["string", "null"],
-      "description": "Winner address when game is over, null during play"
+      "type": "string",
+      "enum": ["you", "opponent"],
+      "description": "Who won, only present when game_status is \"finished\""
     }
   }
 }

@@ -35,7 +35,7 @@ function setWallet(key) {
 }
 
 function decideAction(state) {
-  const equity = estimateEquity(state.hole_cards);
+  const equity = estimateEquity(state.your_cards);
   const { valid_actions } = state;
 
   if (equity > 0.7 && findAction("raise", valid_actions)) {
@@ -123,8 +123,8 @@ async function main() {
       break;
     }
 
-    if (state1.winner) {
-      logger.info("game_over", { winner: state1.winner });
+    if (state1.game_status === "finished") {
+      logger.info("game_over", { result: state1.result });
       break;
     }
 
@@ -147,8 +147,8 @@ async function main() {
       break;
     }
 
-    if (state2.winner) {
-      logger.info("game_over", { winner: state2.winner });
+    if (state2.game_status === "finished") {
+      logger.info("game_over", { result: state2.result });
       break;
     }
 

@@ -62,7 +62,7 @@ async function main() {
 
       logger.info("game_started", {
         hand: state.hand_number,
-        hole_cards: state.hole_cards,
+        your_cards: state.your_cards,
         pot: state.pot,
         your_stack: state.your_stack,
       });
