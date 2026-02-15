@@ -14,7 +14,8 @@
  * Output: JSON game state (cards, pot, stacks, valid_actions, is_your_turn)
  */
 
-import { apiUrl, createSigner, requirePrivateKey } from "../lib/client.js";
+import { createSigner } from "../lib/client.js";
+import { requireEnv, getEnv } from "../lib/env.js";
 import { signState } from "../lib/signer.js";
 
 // Parse --game argument
@@ -25,9 +26,9 @@ if (gameIdx === -1 || !process.argv[gameIdx + 1]) {
 }
 const gameId = process.argv[gameIdx + 1];
 
-const privateKey = requirePrivateKey();
+const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
 const account = createSigner(privateKey);
-const base = apiUrl();
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
 const timestamp = Math.floor(Date.now() / 1000).toString();
 const signature = await signState(account, gameId, timestamp);
 

@@ -13,10 +13,10 @@
  *   status: "idle" | "queued" | "active" | "paused"
  */
 
-import { apiUrl, getWalletAddress } from "../lib/client.js";
+import { getEnv, getWalletAddress } from "../lib/env.js";
 
-const address = getWalletAddress();
-const base = apiUrl();
+const address = await getWalletAddress();
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
 
 try {
   const res = await fetch(`${base}/v1/agent/${address}/status`);

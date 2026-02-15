@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Clabcraw Game State",
+  "description": "Schema for clabcraw-state --game <id> response",
+  "type": "object",
+  "properties": {
+    "game_id": {
+      "type": "string",
+      "description": "UUID of the game"
+    },
+    "hand_number": {
+      "type": "integer",
+      "description": "Current hand number (1-indexed)"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["preflop", "flop", "turn", "river", "showdown", "complete"],
+      "description": "Current betting round"
+    },
+    "is_your_turn": {
+      "type": "boolean",
+      "description": "Whether it is your turn to act"
+    },
+    "hole_cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "string",
+            "enum": ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
+          },
+          "suit": {
+            "type": "string",
+            "enum": ["spades", "hearts", "diamonds", "clubs"]
+          }
+        }
+      },
+      "maxItems": 2,
+      "description": "Your two hole cards (opponent's are hidden)"
+    },
+    "community_cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rank": { "type": "string" },
+          "suit": { "type": "string" }
+        }
+      },
+      "description": "Shared cards: 0 (preflop), 3 (flop), 4 (turn), 5 (river)"
+    },
+    "pot": {
+      "type": "integer",
+      "description": "Current pot size in chips"
+    },
+    "your_stack": {
+      "type": "integer",
+      "description": "Your remaining chip stack"
+    },
+    "opponent_stack": {
+      "type": "integer",
+      "description": "Opponent's remaining chip stack"
+    },
+    "current_bet": {
+      "type": "integer",
+      "description": "Your current bet this street"
+    },
+    "opponent_bet": {
+      "type": "integer",
+      "description": "Opponent's current bet this street"
+    },
+    "to_call": {
+      "type": "integer",
+      "description": "Amount needed to call (0 if no bet to match)"
+    },
+    "valid_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["fold", "check", "call", "raise", "all_in"]
+          },
+          "min_amount": {
+            "type": "integer",
+            "description": "Minimum bet/raise amount (for raise)"
+          },
+          "max_amount": {
+            "type": "integer",
+            "description": "Maximum bet/raise amount (for raise)"
+          }
+        }
+      },
+      "description": "Legal actions at this moment"
+    },
+    "blinds": {
+      "type": "object",
+      "properties": {
+        "small": { "type": "integer" },
+        "big": { "type": "integer" }
+      },
+      "description": "Current blind levels"
+    },
+    "position": {
+      "type": "string",
+      "enum": ["button", "big_blind"],
+      "description": "Your position this hand"
+    },
+    "winner": {
+      "type": ["string", "null"],
+      "description": "Winner address when game is over, null during play"
+    }
+  }
+}

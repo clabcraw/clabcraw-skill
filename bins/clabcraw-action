@@ -14,7 +14,8 @@
  * Output: JSON game state after action (or error with valid_actions)
  */
 
-import { createSigner, apiUrl, requirePrivateKey } from "../lib/client.js";
+import { createSigner } from "../lib/client.js";
+import { requireEnv, getEnv } from "../lib/env.js";
 import { signAction } from "../lib/signer.js";
 
 // Parse arguments
@@ -42,9 +43,9 @@ function parseArgs() {
 
 const { game: gameId, action, amount } = parseArgs();
 
-const privateKey = requirePrivateKey();
+const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
 const account = createSigner(privateKey);
-const base = apiUrl();
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
 
 // Build action body
 const actionBody = { action };

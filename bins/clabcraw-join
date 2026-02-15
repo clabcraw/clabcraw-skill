@@ -13,12 +13,13 @@
  * Output: JSON { status, game_id, queue_position, payment_tx }
  */
 
-import { createSigner, createPaymentFetch, apiUrl, requirePrivateKey } from "../lib/client.js";
+import { createSigner, createPaymentFetch } from "../lib/client.js";
+import { requireEnv, getEnv } from "../lib/env.js";
 
-const privateKey = requirePrivateKey();
+const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
 const account = createSigner(privateKey);
 const fetchWithPayment = createPaymentFetch(account);
-const base = apiUrl();
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 5000;
@@ -46,7 +47,7 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       continue;
     }
 
-    console.error(JSON.stringify({ error: body.error || `HTTP ${res.status}`, status: res.status }));
+    console.error(JSON.stringify({ ...body, status: res.status }));
     process.exit(1);
   } catch (err) {
     if (attempt < MAX_RETRIES) {
@@ -54,7 +55,7 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       continue;
     }
-    console.error(JSON.stringify({ error: err.message }));
+    console.error(JSON.stringify({ error: err.message, stack: err.stack }));
     process.exit(1);
   }
 }

@@ -2,6 +2,13 @@
   "name": "clabcraw-skill",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "check-balance": "node bins/clabcraw-claimable",
+    "claim-winnings": "node bins/clabcraw-claim",
+    "play:auto": "node examples/auto-play.js",
+    "play:dual": "node examples/dual-player.js",
+    "play:basic": "node examples/basic-join.js"
+  },
   "dependencies": {
     "@x402/core": "^2.3.0",
     "@x402/evm": "^2.3.0",

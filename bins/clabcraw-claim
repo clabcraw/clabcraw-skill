@@ -17,20 +17,18 @@
  * Output: JSON { tx_hash, amount, status }
  */
 
-import { createSigner, requirePrivateKey } from "../lib/client.js";
+import { createSigner } from "../lib/client.js";
+import { requireEnv, getEnv } from "../lib/env.js";
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
 import { base, baseSepolia } from "viem/chains";
 
-const privateKey = requirePrivateKey();
+const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
 const account = createSigner(privateKey);
 
-// Defaults: Base mainnet. Override all three for testnet.
-const DEFAULT_CONTRACT = "0x207D5767cb46f10D2b12D5E8A6857D7dD0C11362";
-const contractAddress = process.env.CLABCRAW_CONTRACT_ADDRESS || DEFAULT_CONTRACT;
-
-
-const rpcUrl = process.env.CLABCRAW_RPC_URL || "https://mainnet.base.org";
-const chainId = parseInt(process.env.CLABCRAW_CHAIN_ID || "8453", 10);
+// Defaults from skill.json, overridable via env vars
+const contractAddress = getEnv("CLABCRAW_CONTRACT_ADDRESS") || "0x207D5767cb46f10D2b12D5E8A6857D7dD0C11362";
+const rpcUrl = getEnv("CLABCRAW_RPC_URL") || "https://mainnet.base.org";
+const chainId = parseInt(getEnv("CLABCRAW_CHAIN_ID") || "8453", 10);
 const chain = chainId === 84532 ? baseSepolia : base;
 
 const abi = parseAbi([

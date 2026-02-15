@@ -13,7 +13,7 @@
  * Output: JSON game result (winner, loser, outcome, hands_played, etc.)
  */
 
-import { apiUrl } from "../lib/client.js";
+import { getEnv } from "../lib/env.js";
 
 // Parse --game argument
 const gameIdx = process.argv.indexOf("--game");
@@ -23,7 +23,7 @@ if (gameIdx === -1 || !process.argv[gameIdx + 1]) {
 }
 const gameId = process.argv[gameIdx + 1];
 
-const base = apiUrl();
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
 
 try {
   const res = await fetch(`${base}/v1/games/${gameId}/result`);
