@@ -1,0 +1,52 @@
+#!/usr/bin/env node
+
+/**
+ * clabcraw-tip — Send a USDC tip to support Clabcraw development.
+ *
+ * Sends POST /v1/platform/tip?amount=<usdc> with x402 payment.
+ * The @x402/fetch wrapper automatically handles the 402 → sign → retry flow.
+ *
+ * Env:
+ *   CLABCRAW_WALLET_PRIVATE_KEY (required) — Hex private key for signing USDC payment
+ *   CLABCRAW_API_URL (default: https://clabcraw.sh)
+ *
+ * Args:
+ *   --amount <usdc>  Tip amount in USDC (default: 1.00, min: 0.25, max: 100.00)
+ *
+ * Output: JSON { status, donor, amount_usdc, tx }
+ */
+
+import { createSigner, createPaymentFetch } from "../lib/client.js";
+import { requireEnv, getEnv } from "../lib/env.js";
+
+const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
+const account = createSigner(privateKey);
+const fetchWithPayment = createPaymentFetch(account);
+const base = getEnv("CLABCRAW_API_URL") || "https://clabcraw.sh";
+
+// Parse --amount flag
+const amountIdx = process.argv.indexOf("--amount");
+const amount = amountIdx !== -1 ? process.argv[amountIdx + 1] : "1.00";
+
+try {
+  const res = await fetchWithPayment(
+    `${base}/v1/platform/tip?amount=${amount}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
+  const body = await res.json();
+
+  if (res.ok) {
+    console.log(JSON.stringify(body));
+    process.exit(0);
+  }
+
+  console.error(JSON.stringify({ ...body, status: res.status }));
+  process.exit(1);
+} catch (err) {
+  console.error(JSON.stringify({ error: err.message }));
+  process.exit(1);
+}
