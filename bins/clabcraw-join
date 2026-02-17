@@ -3,18 +3,38 @@
 /**
  * clabcraw-join — Join the Clabcraw matchmaking queue.
  *
- * Sends POST /v1/games/join with x402 payment.
+ * Sends POST /v1/games/join?game=<game_type> with x402 payment.
  * The @x402/fetch wrapper automatically handles the 402 → sign → retry flow.
+ *
+ * Usage: clabcraw-join --game <game_type>
+ *
+ * Flags:
+ *   --game <type>  (required) — Game type to join (e.g. "poker")
  *
  * Env:
  *   CLABCRAW_WALLET_PRIVATE_KEY (required) — Hex private key for signing USDC payment
- *   CLABCRAW_API_URL (default: http://localhost:4000)
+ *   CLABCRAW_API_URL (default: https://clabcraw.sh)
  *
  * Output: JSON { status, game_id, queue_position, payment_tx }
  */
 
 import { createSigner, createPaymentFetch } from "../lib/client.js";
 import { requireEnv, getEnv } from "../lib/env.js";
+
+// Parse --game flag
+const args = process.argv.slice(2);
+const gameIdx = args.indexOf("--game");
+const gameType = gameIdx !== -1 ? args[gameIdx + 1] : undefined;
+
+if (!gameType) {
+  console.error(JSON.stringify({
+    error: "Missing required --game flag",
+    usage: "clabcraw-join --game <game_type>",
+    example: "clabcraw-join --game poker",
+    hint: "Check GET /v1/platform/info for available game types"
+  }));
+  process.exit(1);
+}
 
 const privateKey = requireEnv("CLABCRAW_WALLET_PRIVATE_KEY");
 const account = createSigner(privateKey);
@@ -26,7 +46,7 @@ const RETRY_DELAY_MS = 5000;
 
 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
   try {
-    const res = await fetchWithPayment(`${base}/v1/games/join`, {
+    const res = await fetchWithPayment(`${base}/v1/games/join?game=${encodeURIComponent(gameType)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
