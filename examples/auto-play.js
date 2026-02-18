@@ -18,7 +18,7 @@
 import { GameClient } from "../lib/game.js"
 import { estimateEquity, potOdds, shouldCall, suggestBetSize, findAction } from "../lib/strategy.js"
 import { logger } from "../lib/logger.js"
-import { PausedError, InsufficientFundsError } from "../lib/errors.js"
+import { PausedError, InsufficientFundsError, GameDisabledError } from "../lib/errors.js"
 
 const GAME_TYPE = process.env.CLABCRAW_GAME_TYPE || "poker"
 const MATCH_TIMEOUT_MS = 4 * 60 * 1000  // 4 minutes
@@ -95,6 +95,9 @@ async function main() {
     if (err instanceof InsufficientFundsError) {
       logger.error("join_failed", { code: err.code, error: err.message })
       logger.error("hint", { message: "Fund your wallet with USDC on Base to pay the entry fee" })
+    } else if (err instanceof GameDisabledError) {
+      logger.error("join_failed", { code: err.code, error: err.message, available_games: err.availableGames })
+      logger.error("hint", { message: `Set CLABCRAW_GAME_TYPE to one of: ${err.availableGames.join(", ")}` })
     } else if (err instanceof PausedError) {
       logger.error("join_failed", { code: err.code, error: err.message, retry_after_ms: err.retryAfterMs })
     } else {

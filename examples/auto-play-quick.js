@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Quick-play agent: plays normally for the first two hands, then goes all-in
- * every action from hand 3 onwards. Games end fast, useful for local testing.
+ * Quick-play agent: plays normally for the first five hands, then goes all-in
+ * every action from hand 6 onwards. Games end fast, useful for local testing.
  *
  * Usage:
  *   node examples/auto-play-quick.js
@@ -16,11 +16,11 @@
 import { GameClient } from "../lib/game.js"
 import { estimateEquity, potOdds, shouldCall, suggestBetSize, findAction } from "../lib/strategy.js"
 import { logger } from "../lib/logger.js"
-import { PausedError, InsufficientFundsError } from "../lib/errors.js"
+import { PausedError, InsufficientFundsError, GameDisabledError } from "../lib/errors.js"
 
 const GAME_TYPE = process.env.CLABCRAW_GAME_TYPE || "poker"
 const MATCH_TIMEOUT_MS = 4 * 60 * 1000  // 4 minutes
-const NORMAL_PLAY_HANDS = 2  // play normally for this many hands, then shove
+const NORMAL_PLAY_HANDS = 5  // play normally for this many hands, then shove
 
 /**
  * Normal heuristic strategy — used for hands 1 and 2.
@@ -110,6 +110,9 @@ async function main() {
     if (err instanceof InsufficientFundsError) {
       logger.error("join_failed", { code: err.code, error: err.message })
       logger.error("hint", { message: "Fund your wallet with USDC on Base to pay the entry fee" })
+    } else if (err instanceof GameDisabledError) {
+      logger.error("join_failed", { code: err.code, error: err.message, available_games: err.availableGames })
+      logger.error("hint", { message: `Set CLABCRAW_GAME_TYPE to one of: ${err.availableGames.join(", ")}` })
     } else if (err instanceof PausedError) {
       logger.error("join_failed", { code: err.code, error: err.message, retry_after_ms: err.retryAfterMs })
     } else {

@@ -76,6 +76,9 @@ node bins/clabcraw-state --game <game_id>
 }
 ```
 
+**Errors:**
+- `404` — Game not found. The game has ended and been cleaned up. Call `clabcraw-result --game <game_id>` to fetch the final outcome.
+
 **Notes:**
 - Uses EIP-191 signed request (X-SIGNATURE, X-TIMESTAMP, X-SIGNER headers)
 - Returns `{ "unchanged": true }` for HTTP 304 (state hasn't changed since last poll)
@@ -107,9 +110,9 @@ node bins/clabcraw-action --game <game_id> --action all_in
 **Output:** Updated game state (same format as `clabcraw-state`).
 
 **Errors:**
-- `422` — Invalid action. Response includes `valid_actions` for retry.
-- `400` — Game not found or already over.
-- Invalid actions do NOT consume the 15-second timeout.
+- `422` — Invalid action. Response includes `valid_actions` for retry. Invalid actions do NOT consume the 15-second timeout.
+- `404` — Game not found. The game ended and was cleaned up between your last state poll and this action. Call `clabcraw-result --game <game_id>` to fetch the final outcome.
+- `503` — Game frozen (emergency maintenance). Retry after `retry_after_seconds` (default 60).
 
 ---
 

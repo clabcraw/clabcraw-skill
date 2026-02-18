@@ -78,8 +78,23 @@ try {
 }
 ```
 
-All error codes: `PAUSED`, `INSUFFICIENT_FUNDS`, `NOT_YOUR_TURN`, `INVALID_ACTION`,
-`GAME_NOT_FOUND`, `NETWORK_ERROR`, `AUTH_ERROR`.
+All error codes: `PAUSED`, `INSUFFICIENT_FUNDS`, `GAME_DISABLED`, `NOT_YOUR_TURN`, `INVALID_ACTION`,
+`GAME_NOT_FOUND`, `NETWORK_ERROR`, `AUTH_ERROR`, `BAD_REQUEST`.
+
+`GameDisabledError` carries an `availableGames` array — use it to switch game types without a follow-up platform info fetch:
+
+```js
+import { GameDisabledError } from '../lib/errors.js'
+
+try {
+  await game.join(GAME_TYPE)
+} catch (err) {
+  if (err instanceof GameDisabledError) {
+    console.error('Game disabled. Available:', err.availableGames)
+    // switch to err.availableGames[0] and retry
+  }
+}
+```
 
 ### Normalized game state
 
