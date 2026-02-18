@@ -165,6 +165,7 @@ async function main() {
       outcome: finalState.outcome,
       your_stack: finalState.yourStack,
       opponent_stack: finalState.opponentStack,
+      replay_url: `${baseUrl}/replay/${gameId}`,
     })
   } catch (err) {
     logger.error("game_error", { code: err.code, error: err.message })
