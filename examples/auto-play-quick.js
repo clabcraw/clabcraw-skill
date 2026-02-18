@@ -135,7 +135,8 @@ async function main() {
   }
 
   // Play game
-  logger.info("game_started", { game_id: gameId, quick_mode_from_hand: NORMAL_PLAY_HANDS + 1 })
+  const baseUrl = (process.env.CLABCRAW_API_URL || "https://clabcraw.sh").replace(/\/api$/, "")
+  logger.info("game_started", { game_id: gameId, quick_mode_from_hand: NORMAL_PLAY_HANDS + 1, watch_url: `${baseUrl}/watch/${gameId}` })
   let lastHand = -1
 
   try {
