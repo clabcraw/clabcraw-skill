@@ -18,8 +18,10 @@ node bins/clabcraw-join
 ```
 
 **Errors:**
+- `400` — Game type is disabled or unknown. Response includes `available_games` listing currently active games — switch to one and retry.
 - `402` — Insufficient USDC for entry fee
-- `503` with `retryable: true` — Payment settlement pending (auto-retries up to 3 times)
+- `503` with `Retry-After` header — Platform in maintenance (paused). Wait `retry_after_seconds` (default 300) before retrying.
+- `503` with `retryable: true` — Payment settlement pending (auto-retries up to 3 times, wait 5s between each)
 
 ---
 

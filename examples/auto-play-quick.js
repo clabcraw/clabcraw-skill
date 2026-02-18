@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * Auto-play agent: Joins a game and plays with a simple strategy.
- *
- * Uses the GameClient API from lib/game.js — no shell-out to bins.
- * Strategy errors are handled via typed errors from lib/errors.js.
+ * Quick-play agent: plays normally for the first two hands, then goes all-in
+ * every action from hand 3 onwards. Games end fast, useful for local testing.
  *
  * Usage:
- *   node examples/auto-play.js
+ *   node examples/auto-play-quick.js
  *
  * Local play (two terminals, different wallets):
  *   CLABCRAW_API_URL=http://localhost:4000 \
  *   CLABCRAW_WALLET_PRIVATE_KEY=0x... \
- *   node examples/auto-play.js | jq .
+ *   node examples/auto-play-quick.js | jq .
  */
 
 import { GameClient } from "../lib/game.js"
@@ -22,28 +20,20 @@ import { PausedError, InsufficientFundsError } from "../lib/errors.js"
 
 const GAME_TYPE = process.env.CLABCRAW_GAME_TYPE || "poker"
 const MATCH_TIMEOUT_MS = 4 * 60 * 1000  // 4 minutes
+const NORMAL_PLAY_HANDS = 2  // play normally for this many hands, then shove
 
 /**
- * Decide an action given a normalized game state.
+ * Normal heuristic strategy — used for hands 1 and 2.
  *
  * @param {import('../lib/schema.js').NormalizedState} state
  * @returns {{ action: string, amount?: number }}
  */
-function decideAction(state) {
+function decideNormal(state) {
   const { hole, board, pot, actions } = state
   const callAmount = actions.call?.amount || 0
   const equity = estimateEquity(hole, board)
   const odds = potOdds(callAmount, pot || 1)
 
-  logger.debug("decision", {
-    street: state.street,
-    equity: equity.toFixed(2),
-    pot_odds: odds.toFixed(2),
-    call_amount: callAmount,
-    hand_number: state.handNumber,
-  })
-
-  // Strong hand — raise
   if (equity > 0.6 && findAction("raise", actions)) {
     const raise = findAction("raise", actions)
     const suggested = suggestBetSize(pot || 100, equity)
@@ -51,22 +41,47 @@ function decideAction(state) {
     return { action: "raise", amount: clamped }
   }
 
-  // Positive EV — call
-  if (shouldCall(equity, odds) && findAction("call", actions)) {
-    return { action: "call" }
-  }
-
-  // Free card
-  if (findAction("check", actions)) {
-    return { action: "check" }
-  }
-
-  // Marginal but cheap
-  if (findAction("call", actions)) {
-    return { action: "call" }
-  }
-
+  if (shouldCall(equity, odds) && findAction("call", actions)) return { action: "call" }
+  if (findAction("check", actions)) return { action: "check" }
+  if (findAction("call", actions)) return { action: "call" }
   return { action: "fold" }
+}
+
+/**
+ * All-in strategy — used from hand 3 onwards to end games quickly.
+ * Prefers the explicit all_in action; falls back to raise-to-max.
+ *
+ * @param {import('../lib/schema.js').NormalizedState} state
+ * @returns {{ action: string, amount?: number }}
+ */
+function decideAllIn(state) {
+  const { actions } = state
+
+  if (findAction("all_in", actions)) return { action: "all_in" }
+
+  if (findAction("raise", actions)) {
+    const raise = findAction("raise", actions)
+    return { action: "raise", amount: raise.max }
+  }
+
+  if (findAction("call", actions)) return { action: "call" }
+  return { action: "fold" }
+}
+
+/**
+ * @param {import('../lib/schema.js').NormalizedState} state
+ * @returns {{ action: string, amount?: number }}
+ */
+function decideAction(state) {
+  const isQuickMode = state.handNumber > NORMAL_PLAY_HANDS
+
+  logger.debug("decision", {
+    hand_number: state.handNumber,
+    mode: isQuickMode ? "all_in" : "normal",
+    street: state.street,
+  })
+
+  return isQuickMode ? decideAllIn(state) : decideNormal(state)
 }
 
 async function main() {
@@ -117,7 +132,7 @@ async function main() {
   }
 
   // Play game
-  logger.info("game_started", { game_id: gameId })
+  logger.info("game_started", { game_id: gameId, quick_mode_from_hand: NORMAL_PLAY_HANDS + 1 })
   let lastHand = -1
 
   try {
@@ -127,6 +142,7 @@ async function main() {
         lastHand = state.handNumber
         logger.info("new_hand", {
           hand: state.handNumber,
+          mode: state.handNumber > NORMAL_PLAY_HANDS ? "all_in" : "normal",
           street: state.street,
           your_stack: state.yourStack,
           opponent_stack: state.opponentStack,
