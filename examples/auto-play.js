@@ -78,8 +78,12 @@ function decideAction(state) {
     logger.debug("raise_unsafe", { suggested, min: raise.min, max: raise.max })
   }
 
-  // Positive EV — call
+  // Positive EV — call (use all_in if the call would consume the entire stack,
+  // since the server treats them identically and all_in is semantically cleaner)
   if (shouldCall(equity, odds) && actions.call?.available) {
+    if (actions.call.amount >= yourStack) {
+      return { action: "all_in" }
+    }
     return { action: "call" }
   }
 
@@ -88,8 +92,11 @@ function decideAction(state) {
     return { action: "check" }
   }
 
-  // Marginal but cheap
+  // Marginal but cheap — same all_in detection
   if (actions.call?.available) {
+    if (actions.call.amount >= yourStack) {
+      return { action: "all_in" }
+    }
     return { action: "call" }
   }
 
@@ -179,13 +186,13 @@ async function playGame(game, gameId, baseUrl) {
       logger.info("action_taken_fallback", { action: action.action, reason: "strategy_error" })
     }
 
-    // Submit action — on INVALID_ACTION retry immediately with a safe fallback
-    // so the agent stays in the game rather than exiting mid-hand
+    // Submit action — recover from transient errors to keep the agent in the game
     try {
       logger.info("action_taken", { action: action.action, amount: action.amount || null })
       await game.submitAction(gameId, action)
     } catch (err) {
       if (err.code === "INVALID_ACTION") {
+        // Action was rejected as illegal — retry this turn with a safe fallback
         logger.warn("invalid_action_fallback", {
           attempted: action,
           error: err.message,
@@ -194,6 +201,13 @@ async function playGame(game, gameId, baseUrl) {
         const fallback = state.actions.check?.available ? { action: "check" } : { action: "fold" }
         logger.info("action_taken_fallback", { action: fallback.action, reason: "invalid_action" })
         await game.submitAction(gameId, fallback)
+      } else if (err.code === "AUTH_ERROR" && err.message === "Replay detected") {
+        // The network layer retried a request the server already processed.
+        // The action was accepted on the first attempt — just poll for the next state.
+        logger.warn("replay_detected_continuing", {
+          attempted: action,
+          note: "action was already processed; skipping retry",
+        })
       } else {
         throw err
       }
