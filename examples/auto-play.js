@@ -22,6 +22,9 @@ import { PausedError, InsufficientFundsError, GameDisabledError } from "../lib/e
 
 const GAME_TYPE = process.env.CLABCRAW_GAME_TYPE || "poker"
 const MATCH_TIMEOUT_MS = 4 * 60 * 1000  // 4 minutes
+const POLL_MS = 1_000
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * Decide an action given a normalized game state.
@@ -100,6 +103,106 @@ function decideAction(state) {
   return { action: "fold" }
 }
 
+/**
+ * Play a game to completion, recovering from invalid action errors instead of exiting.
+ *
+ * On INVALID_ACTION, logs a warning and immediately retries the turn with a safe
+ * check/fold fallback so the agent stays in the game rather than crashing out.
+ *
+ * @param {GameClient} game
+ * @param {string} gameId
+ * @param {string} baseUrl
+ * @returns {Promise<import('../lib/schema.js').NormalizedState>}
+ */
+async function playGame(game, gameId, baseUrl) {
+  let lastHand = -1
+
+  while (true) {
+    let state
+    try {
+      state = await game.getState(gameId)
+    } catch (err) {
+      if (err.code === "GAME_NOT_FOUND") {
+        // Game completed before we polled the final state — fetch result directly
+        const result = await game.getResult(gameId).catch(() => null)
+        const youWon = result?.winner?.toLowerCase() === game.address.toLowerCase()
+        const isDraw = result?.outcome === "draw"
+        return {
+          isFinished: true,
+          result: isDraw ? "draw" : result ? (youWon ? "win" : "loss") : "unknown",
+          outcome: result?.outcome || "unknown",
+          yourStack: youWon ? result?.winner_stack : result?.loser_stack,
+          opponentStack: youWon ? result?.loser_stack : result?.winner_stack,
+        }
+      }
+      throw err
+    }
+
+    if (state.unchanged) {
+      await sleep(POLL_MS)
+      continue
+    }
+
+    if (state.isFinished) {
+      logger.info("game_over", {
+        result: state.result,
+        outcome: state.outcome,
+        your_stack: state.yourStack,
+        opponent_stack: state.opponentStack,
+        replay_url: `${baseUrl}/replay/${gameId}`,
+      })
+      return state
+    }
+
+    if (state.handNumber !== lastHand) {
+      lastHand = state.handNumber
+      logger.info("new_hand", {
+        hand: state.handNumber,
+        street: state.street,
+        your_stack: state.yourStack,
+        opponent_stack: state.opponentStack,
+      })
+    }
+
+    if (!state.isYourTurn) {
+      await sleep(POLL_MS)
+      continue
+    }
+
+    // Decide action, falling back to check/fold if strategy throws
+    let action
+    try {
+      action = decideAction(state)
+    } catch (strategyErr) {
+      logger.error("strategy_error", { error: strategyErr.message })
+      action = state.actions.check?.available ? { action: "check" } : { action: "fold" }
+      logger.info("action_taken_fallback", { action: action.action, reason: "strategy_error" })
+    }
+
+    // Submit action — on INVALID_ACTION retry immediately with a safe fallback
+    // so the agent stays in the game rather than exiting mid-hand
+    try {
+      logger.info("action_taken", { action: action.action, amount: action.amount || null })
+      await game.submitAction(gameId, action)
+    } catch (err) {
+      if (err.code === "INVALID_ACTION") {
+        logger.warn("invalid_action_fallback", {
+          attempted: action,
+          error: err.message,
+          valid_actions: err.context?.valid_actions,
+        })
+        const fallback = state.actions.check?.available ? { action: "check" } : { action: "fold" }
+        logger.info("action_taken_fallback", { action: fallback.action, reason: "invalid_action" })
+        await game.submitAction(gameId, fallback)
+      } else {
+        throw err
+      }
+    }
+
+    await sleep(POLL_MS)
+  }
+}
+
 async function main() {
   const game = new GameClient()
   logger.info("agent_ready", { address: game.address, game_type: GAME_TYPE })
@@ -153,56 +256,11 @@ async function main() {
   // Play game
   const baseUrl = (process.env.CLABCRAW_API_URL || "https://clabcraw.sh").replace(/\/api$/, "")
   logger.info("game_started", { game_id: gameId, watch_url: `${baseUrl}/watch/${gameId}` })
-  let lastHand = -1
 
   try {
-    const finalState = await game.playUntilDone(gameId, async (state) => {
-      // Log new hands
-      if (state.handNumber !== lastHand) {
-        lastHand = state.handNumber
-        logger.info("new_hand", {
-          hand: state.handNumber,
-          street: state.street,
-          your_stack: state.yourStack,
-          opponent_stack: state.opponentStack,
-        })
-      }
-
-      if (!state.isYourTurn) return null
-
-      try {
-        const action = decideAction(state)
-        logger.info("action_taken", { action: action.action, amount: action.amount || null })
-        return action
-      } catch (strategyErr) {
-        // If strategy logic crashes, fall back to safe choice
-        logger.error("strategy_error", { error: strategyErr.message })
-        if (state.actions.check?.available) {
-          logger.info("action_taken_fallback", { action: "check", reason: "strategy_error" })
-          return { action: "check" }
-        }
-        logger.info("action_taken_fallback", { action: "fold", reason: "strategy_error" })
-        return { action: "fold" }
-      }
-    })
-
-    logger.info("game_over", {
-      result: finalState.result,
-      outcome: finalState.outcome,
-      your_stack: finalState.yourStack,
-      opponent_stack: finalState.opponentStack,
-      replay_url: `${baseUrl}/replay/${gameId}`,
-    })
+    await playGame(game, gameId, baseUrl)
   } catch (err) {
     logger.error("game_error", { code: err.code, error: err.message })
-    // Check if it was an invalid action error — these are recoverable but indicate a bug
-    if (err.code === "INVALID_ACTION") {
-      logger.error("hint", {
-        message: "Invalid action submitted — this indicates a bug in the strategy function",
-        valid_actions: err.context?.valid_actions,
-        last_decision: err.context?.last_decision,
-      })
-    }
     process.exit(1)
   }
 
