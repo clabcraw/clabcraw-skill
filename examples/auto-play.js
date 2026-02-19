@@ -26,11 +26,15 @@ const MATCH_TIMEOUT_MS = 4 * 60 * 1000  // 4 minutes
 /**
  * Decide an action given a normalized game state.
  *
+ * Validates all decisions against valid_actions and current stack size to prevent
+ * INVALID_ACTION errors. Returns a safe fallback (check/fold) if the primary
+ * strategy would violate game rules.
+ *
  * @param {import('../lib/schema.js').NormalizedState} state
  * @returns {{ action: string, amount?: number }}
  */
 function decideAction(state) {
-  const { hole, board, pot, actions } = state
+  const { hole, board, pot, actions, yourStack } = state
   const callAmount = actions.call?.amount || 0
   const equity = estimateEquity(hole, board)
   const odds = potOdds(callAmount, pot || 1)
@@ -40,32 +44,59 @@ function decideAction(state) {
     equity: equity.toFixed(2),
     pot_odds: odds.toFixed(2),
     call_amount: callAmount,
+    your_stack: yourStack,
     hand_number: state.handNumber,
   })
 
-  // Strong hand — raise
-  if (equity > 0.6 && findAction("raise", actions)) {
-    const raise = findAction("raise", actions)
+  // Strong hand — raise (if available and amount is safe)
+  if (equity > 0.6 && actions.raise?.available) {
+    const raise = actions.raise
     const suggested = suggestBetSize(pot || 100, equity)
-    const clamped = Math.max(raise.min || suggested, Math.min(suggested, raise.max || suggested))
-    return { action: "raise", amount: clamped }
+    
+    // CRITICAL: Clamp to [min, max] and ensure never exceeds stack
+    let amount = Math.max(
+      raise.min || suggested,
+      Math.min(suggested, raise.max || suggested)
+    )
+    // Extra safety: never exceed your current stack
+    amount = Math.min(amount, yourStack)
+    
+    if (amount >= (raise.min || 0) && amount <= (raise.max || yourStack)) {
+      logger.debug("raise_clamped", {
+        suggested,
+        clamped: amount,
+        min: raise.min,
+        max: raise.max,
+        your_stack: yourStack,
+      })
+      return { action: "raise", amount }
+    }
+    // If clamping failed somehow, fall through to next option
+    logger.debug("raise_unsafe", { suggested, min: raise.min, max: raise.max })
   }
 
   // Positive EV — call
-  if (shouldCall(equity, odds) && findAction("call", actions)) {
+  if (shouldCall(equity, odds) && actions.call?.available) {
     return { action: "call" }
   }
 
   // Free card
-  if (findAction("check", actions)) {
+  if (actions.check?.available) {
     return { action: "check" }
   }
 
   // Marginal but cheap
-  if (findAction("call", actions)) {
+  if (actions.call?.available) {
     return { action: "call" }
   }
 
+  // Last resort: fold is always available
+  if (actions.fold?.available) {
+    return { action: "fold" }
+  }
+
+  // Should never reach here, but fail safe
+  logger.warn("no_valid_actions", { available: Object.keys(actions).filter(k => actions[k].available) })
   return { action: "fold" }
 }
 
@@ -139,9 +170,20 @@ async function main() {
 
       if (!state.isYourTurn) return null
 
-      const action = decideAction(state)
-      logger.info("action_taken", { action: action.action, amount: action.amount || null })
-      return action
+      try {
+        const action = decideAction(state)
+        logger.info("action_taken", { action: action.action, amount: action.amount || null })
+        return action
+      } catch (strategyErr) {
+        // If strategy logic crashes, fall back to safe choice
+        logger.error("strategy_error", { error: strategyErr.message })
+        if (state.actions.check?.available) {
+          logger.info("action_taken_fallback", { action: "check", reason: "strategy_error" })
+          return { action: "check" }
+        }
+        logger.info("action_taken_fallback", { action: "fold", reason: "strategy_error" })
+        return { action: "fold" }
+      }
     })
 
     logger.info("game_over", {
@@ -153,6 +195,14 @@ async function main() {
     })
   } catch (err) {
     logger.error("game_error", { code: err.code, error: err.message })
+    // Check if it was an invalid action error — these are recoverable but indicate a bug
+    if (err.code === "INVALID_ACTION") {
+      logger.error("hint", {
+        message: "Invalid action submitted — this indicates a bug in the strategy function",
+        valid_actions: err.context?.valid_actions,
+        last_decision: err.context?.last_decision,
+      })
+    }
     process.exit(1)
   }
 

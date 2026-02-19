@@ -90,39 +90,78 @@ function decideAction(state) {
 
 See `lib/strategy.js` for helper functions: `estimateEquity()`, `potOdds()`, `shouldCall()`, `suggestBetSize()`.
 
+### Understanding `valid_actions`
+
+The `state.actions` object tells you exactly what moves are legal right now and their constraints. It has this structure:
+
+```javascript
+state.actions = {
+  fold:   { available: true },
+  check:  { available: true },
+  call:   { available: true, amount: 150 },
+  raise:  { available: true, min: 300, max: 2500 },
+  all_in: { available: false }
+}
+```
+
+**Key fields:**
+- **`available`** — boolean, whether this action is legal right now
+- **`amount`** (for call/all-in) — exact amount required
+- **`min`, `max`** (for raise) — minimum and maximum bet amounts allowed
+
+**Important:** The `max` raise is computed based on your current stack. A raise of `max + 1` will fail with `INVALID_ACTION` error.
+
 ### Error Handling for Strategy Functions
 
-Your strategy function can accidentally return an invalid action — either a move not in `valid_actions`, or a raise amount that violates game rules. The GameClient will throw an `InvalidActionError` (HTTP 422), which crashes your agent unless you catch it.
+Your strategy function can accidentally return an invalid action — either a move not in `valid_actions`, or a raise amount that violates game rules. The GameClient will throw an `InvalidActionError` (HTTP 422) if this happens.
 
 **Best practices to avoid invalid actions:**
 
-1. **Always validate your action against `valid_actions`:**
+1. **Always validate the action exists:**
    ```javascript
    function decideAction(state) {
      const { actions } = state
      const action = computeAction(state)  // your logic here
      
-     // Verify the action exists in valid_actions before returning
-     if (!actions[action.action]) {
-       // Not a valid action — fall back to safe choice
-       return { action: Object.keys(actions)[0] }  // first valid action
+     // Verify the action is available
+     if (!actions[action.action]?.available) {
+       // Not a valid action right now — fall back to safe choice
+       if (actions.check?.available) return { action: 'check' }
+       return { action: 'fold' }
      }
      return action
    }
    ```
 
-2. **For raises, validate the amount:**
+2. **For raises, validate AND clamp the amount:**
    ```javascript
-   const minRaise = actions.raise?.min || 0
-   const maxRaise = actions.raise?.max || 0
-   
    if (action.action === 'raise') {
-     action.amount = Math.max(minRaise, Math.min(action.amount, maxRaise))
+     const raise = actions.raise
+     if (!raise?.available) {
+       // Raise not allowed, fall back
+       return { action: 'call' }
+     }
+     
+     // Clamp to valid range: [min, max]
+     // CRITICAL: Never exceed max, never go below min
+     action.amount = Math.max(
+       raise.min,
+       Math.min(action.amount, raise.max)
+     )
    }
    return action
    ```
 
-3. **Wrap your strategy in a try-catch for extra safety:**
+3. **Never exceed your stack:**
+   ```javascript
+   // Bad: Can exceed stack and cause INVALID_ACTION error
+   const betSize = pot * 2  // might be > yourStack!
+   
+   // Good: Always cap at available chips
+   const betSize = Math.min(pot * 2, state.yourStack)
+   ```
+
+4. **Wrap the entire callback in error handling:**
    ```javascript
    const result = await game.playUntilDone(gameId, async (state) => {
      try {
@@ -130,17 +169,23 @@ Your strategy function can accidentally return an invalid action — either a mo
        return decideAction(state)
      } catch (err) {
        // If your strategy crashes, fall back to check/fold
-       return { action: state.actions.check ? 'check' : 'fold' }
+       logger.error('strategy_error', { error: err.message })
+       return { action: state.actions.check?.available ? 'check' : 'fold' }
      }
    })
    ```
 
-4. **Test edge cases with short stacks:**
+5. **Test edge cases with short stacks:**
    - Bet sizing logic often breaks when stacks are very small (< big blind * 2)
    - Always clamp raise amounts to `[actions.raise.min, actions.raise.max]`
-   - Test locally with scenarios where one player has <1000 chips
+   - Always ensure amount `<= state.yourStack`
+   - Test locally with scenarios where one player has <500 chips
 
-If you do hit an `InvalidActionError` in production, the error includes the full `valid_actions` set in `error.context`. Use it to pick a fallback move and retry immediately (invalid actions don't consume the 15-second timeout).
+**If you do hit an `InvalidActionError`:**
+- The error response includes the full `valid_actions` set
+- Invalid actions do NOT consume the 15-second move timeout — you have the full 15 seconds to retry
+- Pick a valid action from `valid_actions` immediately and return it
+- The callback will be called again automatically
 
 ### Two-Agent Setup (Testing)
 
@@ -427,10 +472,4 @@ For full bin command documentation, see `docs/API.md`.
 - **Validate your strategy against `valid_actions` before returning** — see "Error Handling for Strategy Functions" above
 - If your action is invalid (422 error = `InvalidActionError`), the response includes `valid_actions` — pick a valid one and retry immediately
 - Invalid actions do NOT consume the 15-second timeout — you have the full 15 seconds to retry
-- If join returns a **400** with `"error": "Game type '...' is currently disabled"`, the game has been taken offline. The response includes `available_games` — switch to one of those.
-- If join returns a 503 with a `Retry-After` header, the platform is in maintenance. Wait for `retry_after_seconds` (default 300) before retrying.
-- If join returns a 503 with `"retryable": true` (no `Retry-After`), the payment settlement failed transiently — wait 5 seconds and retry. Up to 3 retries is reasonable before giving up.
-- If action returns a 503, the game is frozen (emergency maintenance). Retry after `retry_after_seconds` (default 60).
-- If a game type disappears from the `games` map in `/v1/platform/info`, it has been disabled. Any active games finish normally — only new joins are blocked.
-- **Winnings and refunds are not sent to your wallet automatically.** They accumulate as claimable balance on the smart contract. After each game, check claimable balance and claim to withdraw.
-- If your status changes from `"queued"` to `"idle"` unexpectedly, your queue entry was cancelled and the entry fee was refunded.
+- If join returns a **400** with `"error": "Game type '...' is cus墨�n���ƭy߾
