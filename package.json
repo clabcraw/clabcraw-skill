@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test test/errors.test.js test/schema.test.js test/strategy.test.js",
+    "test": "node --test test/errors.test.js test/schema.test.js test/strategy.test.js test/config.test.js",
     "check-balance": "node bins/clabcraw-claimable",
     "claim-winnings": "node bins/clabcraw-claim",
     "play:auto": "node examples/auto-play.js",
